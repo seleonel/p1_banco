@@ -2,13 +2,24 @@
 # Basicamente começar com um loop infinito, sempre pedindo por  #
 # comandos do usuário (retorno da função menuPrincipal)         #
 # ###############################################################
-# bibliotecas para a remoção dos arquivos (no OS) e pegar o tempo
+# bibliotecas para a remoção dos arquivos (no OS), procurar num "dicionario" determinadas
+# expressões e letras, e datetime para pegar o tempo
 import os
+import re
 from datetime import datetime
 
-
 def pedirDinheiro():
-    return float(input("Digite um valor em reais: "))
+    while True:
+        valor_positivo = input("Digite um valor em reais: ")
+        # basicamente procuro por alguma letra até o usuário digitar apenas números
+        if re.search('[a-zA-Z]', valor_positivo):
+            print("Digite um valor válido")
+        elif float(valor_positivo) <= 0:
+            # valores negativos podem afetar as operações
+            # também não posso receber zero para depósitos ou débitos
+            print("Digite um valor válido")
+        else:
+            return float(valor_positivo)
 
 def retornoHist(cpf):
     # sempre vai retornar o historico do cpf pedido
@@ -22,13 +33,25 @@ def retornoHist(cpf):
 def checarCPF():
     # numero de cpf é chamado muitas vezes no programa
     # por isso, é melhor criar uma função
-    while True:
-        cpf = input("Agora digite seu CPF: ")
-        if cpf == "" or int(cpf) <= 0:
-            print("Digite um valor válido para seu CPF")
+    # comando interessante para "error handling", caso haja um erro, except retornará
+    # o valor 0, jogando o usuario direto para o menu
+    try:
+        tentativas = 0
+        while tentativas < 3:
+            cpf = input("Agora digite seu CPF: ")
+            if cpf == ""  or re.search('[a-zA-Z]', cpf):
+                print("Digite um valor válido para seu CPF")
+            elif int(cpf) < 0:
+                print("Digite um valor válido para seu CPF")
+            else:
+                return int(cpf)
+            tentativas += 1
         else:
-            break
-    return cpf
+            # aqui forço o exception
+            return int(cpf)
+    except ValueError:
+        print("O CPF não foi digitado corretamente")
+        return 0
 
 def checarConta(cpf):
     # maneira de checar se arquivo existe, logo, também checa o cpf
@@ -66,6 +89,8 @@ def operacaoDebito(cpf):
         valor_total = float(valores_hist[-1][-1])
         valor_pedido = pedirDinheiro()
         hist_user = modificarHist(cpf)
+        # salvo no histórico o débito com os valores corrigidos para cada tipo de conta
+        # é verificado o tipo de conta do usuario
         if itens[2].strip("\n") == "salario" or itens[2] == "salário":
             # taxa de 5%
             taxa_deb = valor_pedido * 0.05
@@ -75,6 +100,8 @@ def operacaoDebito(cpf):
             else:
                 hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "-", valor_pedido, taxa_deb, novo_total))
                 print("Débito realizado com sucesso! ")
+                print("")
+                print("")
 
         elif itens[2].strip("\n") == "comum":
             # taxa de 3%
@@ -85,6 +112,8 @@ def operacaoDebito(cpf):
             else:
                 hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "-", valor_pedido, taxa_deb, novo_total))
                 print("Débito realizado com sucesso! ")
+                print("")
+                print("")
 
         elif itens[2].strip("\n") == "plus":
             # taxa de 1%
@@ -95,8 +124,12 @@ def operacaoDebito(cpf):
             else:
                 hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "-", valor_pedido, taxa_deb, novo_total))
                 print("Débito realizado com sucesso! ")
+                print("")
+                print("")
 
         else:
+            # caso extremo, caso algo tenha sido registrado incorretamente
+            # muito difícil ocorrer, mas caso hajam injeções nos arquivos
             print("Sua conta foi criada incorretamente")
 
 
@@ -111,16 +144,18 @@ def operacaoDeposito(cpf):
     valor_pedido = pedirDinheiro()
     hist_user = modificarHist(cpf)
     novo_total = valor_pedido + valor_total
-    taxa = 0
+    taxa = 0 # não há taxa, mas para manter a organização, imprimo como 0
     hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "+", valor_pedido, taxa, novo_total))
     print("Deposito realizado com sucesso! ")
+    print("")
+    print("")
 
 
 
 def operacaoSaldo(cpf):
     # Saldo apenas mostra(print) qual o valor total da conta
     valores_hist = retornoHist(cpf)
-    valor_total = float(valores_hist[-1][-1])
+    valor_total = float(valores_hist[-1][-1]) # não é preciso converter
     print("O seu saldo na conta é R$", valor_total)
     if valor_total < 0:
         print("Lembre-se de pagar suas contas :D")
@@ -174,75 +209,126 @@ def menuPrincipal():
              * 6 - Extrato                            *
              *                                        *
              * 0 - Sair                               *
-             ****************************************** """)
-    return int(input("""
+             ******************************************
              *  Digite a operação desejada:           *
              ******************************************
-    """))
 
-
+    """)
+    tentativas = 0
+    while tentativas < 5:
+        escolha_user = input()
+        # sempre chechando se o usuário tenta digitar letras
+        # entretanto, é falho para símbolos como "-"
+        if escolha_user == ""  or re.search('[a-zA-Z]', escolha_user):
+            print("Digite uma opção válida")
+        else:
+            return int(escolha_user)
+        tentativas += 1
+    else:
+        print("Limite de 5 tentativas atingido")
+        return 0
 
 def novoCliente():
     # série de loops para checar potenciais e intencionais erros e bugs de input, nem todos foram filtrados,
     # mas a maioria deles foram neutralizados
     nome_usuario = input("Digite seu nome: ")
     cpf_usuario = checarCPF();
+    if cpf_usuario == 0:
+        print("Você será levado para o menu")
+        return 0
     # criado um arquivo unico para cada usuario
     # caso haja falha num arquivo, nem todos os dados seriam perdidos
     arquivo_user = escreverArq(cpf_usuario)
     historico_user = escreverHist(cpf_usuario)
-    while True:
+    tentativas = 0
+    # 3 tentativas para cada item, resetando o contador quando o loop é finalizado
+    # novamente, retorno pro menu, caso algum valor não tenha sido corretamente providenciado
+    while tentativas < 3:
         tipo_conta = input("Digite o tipo de sua conta (salário, comum ou plus?): ")
         if tipo_conta == "salário" or tipo_conta == "salario" or tipo_conta == "comum" or tipo_conta == "plus":
             break
         else:
             print("Por favor, digite corretamente o tipo de sua conta")
-    while True:
+        tentativas += 1
+    else:
+        print("Você será levado para o menu")
+        return 0
+    tentativas = 0
+    while tentativas < 3:
         valor_inicial = input("Digite um valor inicial para sua conta: ")
-        if valor_inicial == "":
+        if valor_inicial == "" or re.search("[a-zA-Z]", valor_inicial):
             print("Digite um valor inicial válido")
         elif float(valor_inicial) < 0:
             print("Digite um valor inicial válido")
         else:
             break
-    while True:
+        tentativas += 1
+    else:
+        print("Você será levado para o menu")
+        return 0
+    tentativas = 0
+    while tentativas < 3:
         senha_usuario = input("Agora digite sua senha para finalizar a sua criação de conta: ")
         if senha_usuario == "":
+            # acredito que letras sejam aceitas na senha
             print("Por favor, digite uma senha válida")
         else:
             break
+        tentativas += 1
+    else:
+        print("Você será levado para o menu")
+        return 0
+
     valor_total = valor_inicial
     # A partir de agora, vou apenas trabalhar com essa ordem de itens
+    # dados não "mutáveis" criam o perfil do usuário
     arquivo_user.write("%s\n%s\n%s\n%s\n" % (cpf_usuario, nome_usuario, tipo_conta, senha_usuario))
+    # enquanto o valor inicial é gravado no histórico
     if valor_inicial == "0":
         historico_user.write("%s %s %s 0 %s\n" % (pegarTempo(), "", valor_inicial, valor_total)) # Valor inicial nulo como primeiro "débito"
     else:
         historico_user.write("%s %s %s 0 %s\n" % (pegarTempo(), "+", valor_inicial, valor_total))
-
+    # sempre importante fechar os arquivos
     arquivo_user.close()
     historico_user.close()
+
     print("Parabéns! Sua conta foi criada com sucesso.")
+    print("")
+    print("")
 
 
 
 def apagarCliente():
-    pergunta = input("Deseja mesmo deletar sua conta? ")
-    if pergunta == "sim" or pergunta == "Sim" or pergunta == "SIM":
-        cpf_usuario = checarCPF()
-        # funcao os remove apaga o arquivo
-        if checarConta(cpf_usuario):
-            os.remove("usuarios/%s.txt" % cpf_usuario)
-            os.remove("historico/historico_%s.txt" % cpf_usuario)
-            print("Sua conta foi deletada com sucesso")
+    # para apagar o cliente é necessário ter o cpf
+    # adicionei uma pergunta para confirmar o desejo do usuário
+    try:
+        pergunta = input("Deseja mesmo deletar sua conta? ")
+        if pergunta == "sim" or pergunta == "Sim" or pergunta == "SIM":
+            cpf_usuario = checarCPF()
+            # funcao os remove apaga o arquivo
+            if checarConta(cpf_usuario):
+                # funcao remove da biblioteca os apaga diretamente os arquivos
+                # entretanto preciso checar se existem antes para evitar erros
+                os.remove("usuarios/%s.txt" % cpf_usuario)
+                os.remove("historico/historico_%s.txt" % cpf_usuario)
+                print("Sua conta foi deletada com sucesso")
+                print("")
+                print("")
+            else:
+                print("Sua conta não existe ou foi digitada incorretamente")
+                print("")
+                print("")
         else:
-            print("Sua conta não existe ou foi digitada incorretamente")
-    else:
-        # qualquer erro de digitação será desconsiderado para evitar acidentes
-        # usuario será jogado para o menu principal
-        print("Sua conta NÂO foi deletada ")
-
+            # qualquer erro de digitação será desconsiderado para evitar acidentes
+            # usuario será jogado para o menu principal
+            print("Sua conta NÂO foi deletada ")
+    # caso dê erros de permissão, conta não será apagada
+    except IOError:
+            print("Sua conta não foi deletada por motivos técnicos, por favor consulte um técnico")
+            return 0
 
 def contaDebito():
+    # para débito é preciso checar se a conta existe, e se a senha está correta
     cpf_usuario = checarCPF()
     if checarConta(cpf_usuario):
         arquivo_user = lerArq(cpf_usuario);
@@ -250,9 +336,11 @@ def contaDebito():
             arquivo_user.close()
             operacaoDebito(cpf_usuario);
     else:
+        # mensagem de erro padrão para caso seja digitado algo incorreto
         print("Sua conta não existe ou não foi digitada corretamente")
 
 def contaDeposito():
+    # só CPF é checado para deposito
     cpf_usuario = checarCPF()
     if checarConta(cpf_usuario):
         operacaoDeposito(cpf_usuario);
@@ -261,6 +349,7 @@ def contaDeposito():
 
 
 def contaSaldo():
+    # saldo apenas cpf e senha são pedidos
     cpf_usuario = checarCPF()
     if checarConta(cpf_usuario):
         arquivo_user = lerArq(cpf_usuario);
@@ -271,6 +360,7 @@ def contaSaldo():
         print("Sua conta não existe ou não foi digitada corretamente")
 
 def contaExtrato():
+    # extrato precisa de senha e cpf
     cpf_usuario = checarCPF()
     if checarConta(cpf_usuario):
         arquivo_user = lerArq(cpf_usuario);
@@ -282,6 +372,8 @@ def contaExtrato():
 
 
 while True:
+    # menu principal simples, que servirá de fallback caso algum erro ocorra
+    # no caso de erros, valores nulos serão retornados
     itens_menu = menuPrincipal();
 
     if itens_menu == 1:
@@ -297,6 +389,9 @@ while True:
     elif itens_menu == 6:
         contaExtrato();
     else:
+        # qualquer valor inválido + 0 sairá do programa por segurança
         break
 
 print("Operação finalizada com sucesso! ")
+print("")
+print("")
