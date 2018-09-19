@@ -2,11 +2,22 @@
 # Basicamente começar com um loop infinito, sempre pedindo por  #
 # comandos do usuário (retorno da função menuPrincipal)         #
 # ###############################################################
-# biblioteca os para a remoção do arquivo
+# bibliotecas para a remoção dos arquivos (no OS) e pegar o tempo
 import os
 from datetime import datetime
+
+
 def pedirDinheiro():
     return float(input("Digite um valor em reais: "))
+
+def retornoHist(cpf):
+    # sempre vai retornar o historico do cpf pedido
+    lista_historico = []
+    hist_user = lerHist(cpf)
+    for linhas in hist_user:
+        lista_historico.append(linhas.split(" "))
+    hist_user.close()
+    return lista_historico
 
 def checarCPF():
     # numero de cpf é chamado muitas vezes no programa
@@ -28,33 +39,30 @@ def checarConta(cpf):
 def checarSenha(arquivo):
     # senha também importante checar
     tentativas = 0
+    itens = arquivo.readlines()
+    senha_user = itens[3].strip("\n")
     # usuario tem 3 tentativas para acertar a senha
     while tentativas < 3:
-        senha_user = input("Por favor digite sua senha: ")
-        # leio a linha 4, onde toda senha está incluida
-        for iteracao, linhas in enumerate(arquivo):
-            if iteracao == 3:
-                # descarto o caractere de nova linha da senha
-                linha_limpa = linhas.strip("\n")
-                if linha_limpa == senha_user:
-                    return True
-            elif iteracao > 3:
-                break
-        print("Tente novamente")
-        tentativas += 1
+        # comparo a senha digitada com o que foi registrado no arquivo
+        senha_dig = input("Por favor digite sua senha: ")
+        if senha_user == senha_dig:
+            return True
+        else:
+            print("Tente novamente")
+            tentativas += 1
     else:
         print("3 tentativas foram estouradas")
 
 
 
 def operacaoDebito(cpf):
+        # aqui é feita a operação para debito
+        # é apenas lido e convertido o ultimo termo da lista
+        # que sempre será o valor total
         arquivo_user = lerArq(cpf)
-        hist_user = lerHist(cpf)
+        valores_hist = retornoHist(cpf)
         itens = arquivo_user.readlines()
-        valores_hist = []
-        for linhas in hist_user:
-            valores_hist.append(linhas.split(" "))
-        hist_user.close()
+        # variaveis definidas a partir do ultimo termo e ultima lista da lista
         valor_total = float(valores_hist[-1][-1])
         valor_pedido = pedirDinheiro()
         hist_user = modificarHist(cpf)
@@ -66,6 +74,7 @@ def operacaoDebito(cpf):
                 print("Contas salário não podem ter saldo negativo")
             else:
                 hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "-", valor_pedido, taxa_deb, novo_total))
+                print("Débito realizado com sucesso! ")
 
         elif itens[2].strip("\n") == "comum":
             # taxa de 3%
@@ -75,7 +84,7 @@ def operacaoDebito(cpf):
                 print("Contas comum não podem ter saldo negativo menor que R$ 500")
             else:
                 hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "-", valor_pedido, taxa_deb, novo_total))
-
+                print("Débito realizado com sucesso! ")
 
         elif itens[2].strip("\n") == "plus":
             # taxa de 1%
@@ -85,7 +94,7 @@ def operacaoDebito(cpf):
                 print("Contas plus não podem ter saldo negativo menor que R$ 5000")
             else:
                 hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "-", valor_pedido, taxa_deb, novo_total))
-
+                print("Débito realizado com sucesso! ")
 
         else:
             print("Sua conta foi criada incorretamente")
@@ -93,7 +102,37 @@ def operacaoDebito(cpf):
 
         arquivo_user.close()
         hist_user.close()
-        print("Débito realizado com sucesso! ")
+
+
+def operacaoDeposito(cpf):
+    valores_hist = retornoHist(cpf)
+    # mesmo processo que no debito
+    valor_total = float(valores_hist[-1][-1])
+    valor_pedido = pedirDinheiro()
+    hist_user = modificarHist(cpf)
+    novo_total = valor_pedido + valor_total
+    taxa = 0
+    hist_user.write("%s %s %s %s %s\n" % (pegarTempo(), "+", valor_pedido, taxa, novo_total))
+    print("Deposito realizado com sucesso! ")
+
+
+
+def operacaoSaldo(cpf):
+    # Saldo apenas mostra(print) qual o valor total da conta
+    valores_hist = retornoHist(cpf)
+    valor_total = float(valores_hist[-1][-1])
+    print("O seu saldo na conta é R$", valor_total)
+    if valor_total < 0:
+        print("Lembre-se de pagar suas contas :D")
+
+def operacaoExtrato(cpf):
+    valores_hist = retornoHist(cpf)
+    arquivo_user = lerArq(cpf)
+    itens = arquivo_user.readlines()
+    print("")
+    print("Nome: {}CPF: {}Conta: {}" .format(itens[1], itens[0], itens[2]))
+    for listas in valores_hist:
+        print("Data: {} {} {} {:^12.2f} {} {:5.2f} {} {:>12.2f} ".format(listas[0], listas[1], listas[2], float(listas[3]),"Tarifa:", float(listas[4]),"Saldo:", float(listas[5])))
 
 # funcoes que retornam o arquivo para a conta para o cliente nos modos
 # escrita, modificação e leitura, podem haver problemas de permissões em sistemas
@@ -191,9 +230,12 @@ def apagarCliente():
     if pergunta == "sim" or pergunta == "Sim" or pergunta == "SIM":
         cpf_usuario = checarCPF()
         # funcao os remove apaga o arquivo
-        os.remove("usuarios/%s.txt" % cpf_usuario)
-        os.remove("historico/historico_%s.txt" % cpf_usuario)
-        print("Sua conta foi deletada com sucesso")
+        if checarConta(cpf_usuario):
+            os.remove("usuarios/%s.txt" % cpf_usuario)
+            os.remove("historico/historico_%s.txt" % cpf_usuario)
+            print("Sua conta foi deletada com sucesso")
+        else:
+            print("Sua conta não existe ou foi digitada incorretamente")
     else:
         # qualquer erro de digitação será desconsiderado para evitar acidentes
         # usuario será jogado para o menu principal
@@ -224,7 +266,7 @@ def contaSaldo():
         arquivo_user = lerArq(cpf_usuario);
         if checarSenha(arquivo_user):
             arquivo_user.close()
-            operacaoDeposito(cpf_usuario);
+            operacaoSaldo(cpf_usuario);
     else:
         print("Sua conta não existe ou não foi digitada corretamente")
 
