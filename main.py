@@ -10,16 +10,24 @@ from datetime import datetime
 
 def pedirDinheiro():
     while True:
-        valor_positivo = input("Digite um valor em reais: ")
-        # basicamente procuro por alguma letra até o usuário digitar apenas números
-        if re.search('[a-zA-Z]', valor_positivo):
-            print("Digite um valor válido")
-        elif float(valor_positivo) <= 0:
-            # valores negativos podem afetar as operações
-            # também não posso receber zero para depósitos ou débitos
-            print("Digite um valor válido")
-        else:
-            return float(valor_positivo)
+        # O comando try é essencialmente usado para orientação de objetos, mas é muito útil
+        # quando utilizado com error handling
+        # Um bloco é "experimentado/tentado", e se algum erro ocorrer, o programa não sai com o system exit
+        try:
+            valor_positivo = input("Digite um valor em reais: ")
+            # basicamente procuro por alguma letra até o usuário digitar apenas números
+            if re.search('[a-zA-Z]', valor_positivo):
+                print("Digite um valor válido")
+            elif valor_positivo in "!-=*&¨$#@|}{[]´":
+                print("Digite um valor válido")
+            elif float(valor_positivo) <= 0:
+                # valores negativos podem afetar as operações
+                # também não posso receber zero para depósitos ou débitos
+                print("Digite um valor válido")
+            else:
+                return float(valor_positivo)
+        except ValueError as ex:
+            print("Valor válido não inserido, o valor inserido não pode ser convertido")
 
 def retornoHist(cpf):
     # sempre vai retornar o historico do cpf pedido
@@ -91,7 +99,7 @@ def operacaoDebito(cpf):
         hist_user = modificarHist(cpf)
         # salvo no histórico o débito com os valores corrigidos para cada tipo de conta
         # é verificado o tipo de conta do usuario
-        if itens[2].strip("\n") == "salario" or itens[2] == "salário":
+        if itens[2].strip("\n") == "salario" or itens[2].strip("\n") == "salário":
             # taxa de 5%
             taxa_deb = valor_pedido * 0.05
             novo_total = valor_total - (valor_pedido * 1.05) # taxas
